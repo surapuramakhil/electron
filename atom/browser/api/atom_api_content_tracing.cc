@@ -66,11 +66,6 @@ scoped_refptr<TracingController::TraceDataEndpoint> GetTraceDataEndpoint(
       result_file_path, base::Bind(callback, result_file_path));
 }
 
-void OnRecordingStopped(const atom::util::CopyablePromise& promise,
-                        const base::FilePath& path) {
-  promise.GetPromise().Resolve(path);
-}
-
 v8::Local<v8::Promise> StopRecording(v8::Isolate* isolate,
                                      const base::FilePath& path) {
   atom::util::Promise promise(isolate);
@@ -80,13 +75,9 @@ v8::Local<v8::Promise> StopRecording(v8::Isolate* isolate,
   // CreateFileEndpoint API accepts OnceCallback.
   TracingController::GetInstance()->StopTracing(GetTraceDataEndpoint(
       path,
-      base::Bind(&OnRecordingStopped, atom::util::CopyablePromise(promise))));
+      base::Bind(atom::util::CopyablePromise::ResolveCopyablePromise<base::FilePath>,
+                 atom::util::CopyablePromise(promise), std::move(path)));
   return handle;
-}
-
-void OnCategoriesAvailable(atom::util::Promise promise,
-                           const std::set<std::string>& categories) {
-  promise.Resolve(categories);
 }
 
 v8::Local<v8::Promise> GetCategories(v8::Isolate* isolate) {
@@ -94,24 +85,20 @@ v8::Local<v8::Promise> GetCategories(v8::Isolate* isolate) {
   v8::Local<v8::Promise> handle = promise.GetHandle();
 
   // Note: This method always succeeds.
-  TracingController::GetInstance()->GetCategories(
-      base::BindOnce(&OnCategoriesAvailable, std::move(promise)));
+  TracingController::GetInstance()->GetCategories(base::BindOnce(
+      &OnCategoriesAvailable<std::set<std::string>>, std::move(promise)));
   return handle;
 }
 
-void OnTracingStarted(atom::util::Promise promise) {
-  promise.Resolve();
-}
-
 v8::Local<v8::Promise> StartTracing(
-    v8::Isolate* isolate,
-    const base::trace_event::TraceConfig& trace_config) {
+    v8::Isolate* isolate const base::trace_event::TraceConfig& trace_config) {
   atom::util::Promise promise(isolate);
   v8::Local<v8::Promise> handle = promise.GetHandle();
 
   // Note: This method always succeeds.
   TracingController::GetInstance()->StartTracing(
-      trace_config, base::BindOnce(&OnTracingStarted, std::move(promise)));
+      trace_config, base::BindOnce(atom::util::Promise::ResolveEmptyPromise,
+                                   std::move(promise)));
   return handle;
 }
 
