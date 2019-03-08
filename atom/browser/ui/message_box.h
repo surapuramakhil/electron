@@ -8,8 +8,11 @@
 #include <string>
 #include <vector>
 
+#include "atom/common/native_mate_converters/value_converter.h"
+#include "atom/common/promise_util.h"
 #include "base/callback_forward.h"
 #include "base/strings/string16.h"
+#include "native_mate/dictionary.h"
 
 namespace gfx {
 class ImageSkia;
@@ -32,19 +35,16 @@ enum MessageBoxOptions {
   MESSAGE_BOX_NO_LINK = 1 << 0,
 };
 
-typedef base::Callback<void(int code, bool checkbox_checked)>
-    MessageBoxCallback;
-
-int ShowMessageBox(NativeWindow* parent_window,
-                   MessageBoxType type,
-                   const std::vector<std::string>& buttons,
-                   int default_id,
-                   int cancel_id,
-                   int options,
-                   const std::string& title,
-                   const std::string& message,
-                   const std::string& detail,
-                   const gfx::ImageSkia& icon);
+int ShowMessageBoxSync(NativeWindow* parent_window,
+                       MessageBoxType type,
+                       const std::vector<std::string>& buttons,
+                       int default_id,
+                       int cancel_id,
+                       int options,
+                       const std::string& title,
+                       const std::string& message,
+                       const std::string& detail,
+                       const gfx::ImageSkia& icon);
 
 void ShowMessageBox(NativeWindow* parent_window,
                     MessageBoxType type,
@@ -58,7 +58,7 @@ void ShowMessageBox(NativeWindow* parent_window,
                     const std::string& checkbox_label,
                     bool checkbox_checked,
                     const gfx::ImageSkia& icon,
-                    const MessageBoxCallback& callback);
+                    atom::util::Promise promise);
 
 // Like ShowMessageBox with simplest settings, but safe to call at very early
 // stage of application.

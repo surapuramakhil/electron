@@ -75,13 +75,14 @@ void AtomJavaScriptDialogManager::RunJavaScriptDialog(
       window = relay->GetNativeWindow();
   }
 
-  atom::ShowMessageBox(
-      window, atom::MessageBoxType::MESSAGE_BOX_TYPE_NONE, buttons, -1, 0,
-      atom::MessageBoxOptions::MESSAGE_BOX_NONE, "",
-      base::UTF16ToUTF8(message_text), "", checkbox, false, gfx::ImageSkia(),
-      base::Bind(&AtomJavaScriptDialogManager::OnMessageBoxCallback,
-                 base::Unretained(this), base::Passed(std::move(callback)),
-                 origin));
+  // TODO(codebytere): uncomment this
+  // atom::ShowMessageBox(
+  //     window, atom::MessageBoxType::MESSAGE_BOX_TYPE_NONE, buttons, -1, 0,
+  //     atom::MessageBoxOptions::MESSAGE_BOX_NONE, "",
+  //     base::UTF16ToUTF8(message_text), "", checkbox, false, gfx::ImageSkia(),
+  //     base::Bind(&AtomJavaScriptDialogManager::OnMessageBoxCallback,
+  //                base::Unretained(this), base::Passed(std::move(callback)),
+  //                origin));
 }
 
 void AtomJavaScriptDialogManager::RunBeforeUnloadDialog(

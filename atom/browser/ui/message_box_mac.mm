@@ -7,7 +7,6 @@
 #import <Cocoa/Cocoa.h>
 
 #include "atom/browser/native_window.h"
-#include "base/callback.h"
 #include "base/mac/mac_util.h"
 #include "base/strings/sys_string_conversions.h"
 #include "skia/ext/skia_utils_mac.h"
@@ -90,16 +89,16 @@ NSAlert* CreateNSAlert(NativeWindow* parent_window,
 
 }  // namespace
 
-int ShowMessageBox(NativeWindow* parent_window,
-                   MessageBoxType type,
-                   const std::vector<std::string>& buttons,
-                   int default_id,
-                   int cancel_id,
-                   int options,
-                   const std::string& title,
-                   const std::string& message,
-                   const std::string& detail,
-                   const gfx::ImageSkia& icon) {
+int ShowMessageBoxSync(NativeWindow* parent_window,
+                       MessageBoxType type,
+                       const std::vector<std::string>& buttons,
+                       int default_id,
+                       int cancel_id,
+                       int options,
+                       const std::string& title,
+                       const std::string& message,
+                       const std::string& detail,
+                       const gfx::ImageSkia& icon) {
   NSAlert* alert =
       CreateNSAlert(parent_window, type, buttons, default_id, cancel_id, title,
                     message, detail, "", false, icon);
@@ -134,7 +133,7 @@ void ShowMessageBox(NativeWindow* parent_window,
                     const std::string& checkbox_label,
                     bool checkbox_checked,
                     const gfx::ImageSkia& icon,
-                    const MessageBoxCallback& callback) {
+                    atom::util::Promise promise) {
   NSAlert* alert =
       CreateNSAlert(parent_window, type, buttons, default_id, cancel_id, title,
                     message, detail, checkbox_label, checkbox_checked, icon);
@@ -143,18 +142,27 @@ void ShowMessageBox(NativeWindow* parent_window,
   // window to wait for.
   if (!parent_window) {
     int ret = [[alert autorelease] runModal];
-    callback.Run(ret, alert.suppressionButton.state == NSOnState);
+    mate::Dictionary dict = mate::Dictionary::CreateEmpty(promise.isolate());
+    dict.Set("response", ret);
+    dict.Set("checkboxChecked", alert.suppressionButton.state == NSOnState);
+    promise.Resolve(dict.GetHandle());
   } else {
     NSWindow* window =
         parent_window ? parent_window->GetNativeWindow().GetNativeNSWindow()
                       : nil;
-    // Duplicate the callback object here since c is a reference and gcd would
-    // only store the pointer, by duplication we can force gcd to store a copy.
-    __block MessageBoxCallback callback_ = callback;
+
+    __block atom::util::Promise p = std::move(promise);
     [alert beginSheetModalForWindow:window
                   completionHandler:^(NSModalResponse response) {
-                    callback_.Run(response,
-                                  alert.suppressionButton.state == NSOnState);
+                    mate::Dictionary dict =
+                        mate::Dictionary::CreateEmpty(p.isolate());
+                    // NSInteger is a long and we have a native_mate converter
+                    // for long long (int64_t) so we cast this here
+                    // TODO(codebytere): write a bespoke converter for long
+                    dict.Set("response", (long long)response);
+                    dict.Set("checkboxChecked",
+                             alert.suppressionButton.state == NSOnState);
+                    p.Resolve(dict.GetHandle());
                   }];
   }
 }

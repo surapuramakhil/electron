@@ -148,14 +148,12 @@ class GtkMessageBox : public NativeWindowObserver {
   int RunSynchronous() {
     Show();
     int response = gtk_dialog_run(GTK_DIALOG(dialog_));
-    if (response < 0)
-      return cancel_id_;
-    else
-      return response;
+    return (response < 0) ? cancel_id_ : response;
   }
 
-  void RunAsynchronous(const MessageBoxCallback& callback) {
-    callback_ = callback;
+  void RunAsynchronous(atom::util::Promise promise) {
+    promise_.reset(new atom::util::Promise(promise));
+
     g_signal_connect(dialog_, "delete-event",
                      G_CALLBACK(gtk_widget_hide_on_delete), nullptr);
     g_signal_connect(dialog_, "response", G_CALLBACK(OnResponseDialogThunk),
@@ -181,7 +179,7 @@ class GtkMessageBox : public NativeWindowObserver {
 
   NativeWindow* parent_;
   GtkWidget* dialog_;
-  MessageBoxCallback callback_;
+  std::unique_ptr<atom::util::Promise> promise_;
 
   DISALLOW_COPY_AND_ASSIGN(GtkMessageBox);
 };
@@ -189,11 +187,16 @@ class GtkMessageBox : public NativeWindowObserver {
 void GtkMessageBox::OnResponseDialog(GtkWidget* widget, int response) {
   gtk_widget_hide(dialog_);
 
-  if (response < 0)
-    callback_.Run(cancel_id_, checkbox_checked_);
-  else
-    callback_.Run(response, checkbox_checked_);
-  delete this;
+  if (promise_) {
+    mate::Dictionary dict = mate::Dictionary::CreateEmpty(promise_->isolate());
+    dict.Set("checkboxChecked", checkbox_checked_);
+    if (response < 0)
+      dict.Set("response", cancel_id_);
+    else
+      dict.Set("response", response);
+    promise_->Resolve(dict.GetHandle());
+    delete this;
+  }
 }
 
 void GtkMessageBox::OnCheckboxToggled(GtkWidget* widget) {
@@ -202,16 +205,16 @@ void GtkMessageBox::OnCheckboxToggled(GtkWidget* widget) {
 
 }  // namespace
 
-int ShowMessageBox(NativeWindow* parent,
-                   MessageBoxType type,
-                   const std::vector<std::string>& buttons,
-                   int default_id,
-                   int cancel_id,
-                   int options,
-                   const std::string& title,
-                   const std::string& message,
-                   const std::string& detail,
-                   const gfx::ImageSkia& icon) {
+int ShowMessageBoxSync(NativeWindow* parent,
+                       MessageBoxType type,
+                       const std::vector<std::string>& buttons,
+                       int default_id,
+                       int cancel_id,
+                       int options,
+                       const std::string& title,
+                       const std::string& message,
+                       const std::string& detail,
+                       const gfx::ImageSkia& icon) {
   return GtkMessageBox(parent, type, buttons, default_id, cancel_id, title,
                        message, detail, "", false, icon)
       .RunSynchronous();
@@ -229,10 +232,10 @@ void ShowMessageBox(NativeWindow* parent,
                     const std::string& checkbox_label,
                     bool checkbox_checked,
                     const gfx::ImageSkia& icon,
-                    const MessageBoxCallback& callback) {
+                    atom::util::Promise promise) {
   (new GtkMessageBox(parent, type, buttons, default_id, cancel_id, title,
                      message, detail, checkbox_label, checkbox_checked, icon))
-      ->RunAsynchronous(callback);
+      ->RunAsynchronous(std::move(promise));
 }
 
 void ShowErrorBox(const base::string16& title, const base::string16& content) {
