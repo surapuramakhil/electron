@@ -774,6 +774,56 @@ describe('session module', () => {
     })
   })
 
+  describe('ses.getBlobData(identifier)', () => {
+    it('returns blob data for uuid', (done) => {
+      const scheme = 'cors-blob'
+      const protocol = session.defaultSession.protocol
+      const url = `${scheme}://host`
+      before(() => {
+        if (w != null) w.destroy()
+        w = new BrowserWindow({ show: false })
+      })
+
+      after((done) => {
+        protocol.unregisterProtocol(scheme, () => {
+          closeWindow(w).then(() => {
+            w = null
+            done()
+          })
+        })
+      })
+
+      const postData = JSON.stringify({
+        type: 'blob',
+        value: 'hello'
+      })
+      const content = `<html>
+                       <script>
+                       let fd = new FormData();
+                       fd.append('file', new Blob(['${postData}'], {type:'application/json'}));
+                       fetch('${url}', {method:'POST', body: fd });
+                       </script>
+                       </html>`
+
+      protocol.registerStringProtocol(scheme, (request, callback) => {
+        if (request.method === 'GET') {
+          callback({ data: content, mimeType: 'text/html' })
+        } else if (request.method === 'POST') {
+          const uuid = request.uploadData[1].blobUUID
+          assert(uuid)
+          const result = await session.defaultSession.getBlobData(uuid).then(result => {
+            assert.strictEqual(result.toString(), postData)
+            done()
+          })
+        }
+      }, (error) => {
+        if (error) return done(error)
+        w.loadURL(url)
+      })
+    })
+  })
+
+  // TODO(codebytere): remove when promisification is complete
   describe('ses.getBlobData(identifier, callback)', () => {
     it('returns blob data for uuid', (done) => {
       const scheme = 'cors-blob'

@@ -82,8 +82,7 @@ class Session : public mate::TrackableObject<Session>,
   void AllowNTLMCredentialsForDomains(const std::string& domains);
   void SetUserAgent(const std::string& user_agent, mate::Arguments* args);
   std::string GetUserAgent();
-  void GetBlobData(const std::string& uuid,
-                   const AtomBlobReader::CompletionCallback& callback);
+  v8::Local<v8::Promise> GetBlobData(const std::string& uuid);
   void CreateInterruptedDownload(const mate::Dictionary& options);
   void SetPreloads(const std::vector<base::FilePath::StringType>& preloads);
   std::vector<base::FilePath::StringType> GetPreloads() const;

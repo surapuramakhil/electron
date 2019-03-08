@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "atom/common/promise_util.h"
 #include "base/callback.h"
 
 namespace content {
@@ -35,13 +36,10 @@ namespace atom {
 // except Ctor are expected to be called on IO thread.
 class AtomBlobReader {
  public:
-  using CompletionCallback = base::Callback<void(v8::Local<v8::Value>)>;
-
   explicit AtomBlobReader(content::ChromeBlobStorageContext* blob_context);
   ~AtomBlobReader();
 
-  void StartReading(const std::string& uuid,
-                    const AtomBlobReader::CompletionCallback& callback);
+  void StartReading(const std::string& uuid, atom::util::Promise promise);
 
  private:
   // A self-destroyed helper class to read the blob data.

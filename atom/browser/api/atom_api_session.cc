@@ -667,16 +667,17 @@ std::string Session::GetUserAgent() {
   return browser_context_->GetUserAgent();
 }
 
-void Session::GetBlobData(const std::string& uuid,
-                          const AtomBlobReader::CompletionCallback& callback) {
-  if (callback.is_null())
-    return;
+v8::Local<v8::Promise> Session::GetBlobData(const std::string& uuid) {
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  util::Promise promise(isolate);
+  v8::Local<v8::Promise> handle = promise.GetHandle();
 
   AtomBlobReader* blob_reader = browser_context()->GetBlobReader();
   base::PostTaskWithTraits(
       FROM_HERE, {BrowserThread::IO},
       base::BindOnce(&AtomBlobReader::StartReading,
-                     base::Unretained(blob_reader), uuid, callback));
+                     base::Unretained(blob_reader), uuid, std::move(promise)));
+  return handle;
 }
 
 void Session::CreateInterruptedDownload(const mate::Dictionary& options) {
