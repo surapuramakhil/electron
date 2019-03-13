@@ -14,6 +14,7 @@
 #include "atom/common/native_mate_converters/gfx_converter.h"
 #include "atom/common/native_mate_converters/gurl_converter.h"
 #include "atom/common/native_mate_converters/value_converter.h"
+#include "atom/common/node_includes.h"
 #include "base/files/file_util.h"
 #include "base/strings/pattern.h"
 #include "base/strings/string_util.h"
@@ -37,8 +38,6 @@
 #include "base/win/scoped_gdi_object.h"
 #include "ui/gfx/icon_util.h"
 #endif
-
-#include "atom/common/node_includes.h"
 
 namespace atom {
 
@@ -509,6 +508,11 @@ mate::Handle<NativeImage> NativeImage::CreateFromPath(
 mate::Handle<NativeImage> NativeImage::CreateFromBuffer(
     mate::Arguments* args,
     v8::Local<v8::Value> buffer) {
+  if (!node::Buffer::HasInstance(buffer)) {
+    args->ThrowError("buffer must be a node Buffer");
+    return mate::Handle<NativeImage>();
+  }
+
   int width = 0;
   int height = 0;
   double scale_factor = 1.;

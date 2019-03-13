@@ -7,6 +7,7 @@ const net = require('net')
 const fs = require('fs')
 const path = require('path')
 const cp = require('child_process')
+const split = require('split')
 const { ipcRenderer, remote } = require('electron')
 const { emittedOnce } = require('./events-helpers')
 const { closeWindow } = require('./window-helpers')
@@ -226,6 +227,33 @@ describe('app module', () => {
         })
       })
     })
+
+    it('passes arguments to the second-instance event', async () => {
+      const appPath = path.join(__dirname, 'fixtures', 'api', 'singleton')
+      const first = ChildProcess.spawn(remote.process.execPath, [appPath])
+      const firstExited = emittedOnce(first, 'exit')
+
+      // Wait for the first app to boot.
+      const firstStdoutLines = first.stdout.pipe(split())
+      while ((await emittedOnce(firstStdoutLines, 'data')).toString() !== 'started') {
+        // wait.
+      }
+      const data2Promise = emittedOnce(firstStdoutLines, 'data')
+
+      const secondInstanceArgs = [remote.process.execPath, appPath, '--some-switch', 'some-arg']
+      const second = ChildProcess.spawn(secondInstanceArgs[0], secondInstanceArgs.slice(1))
+      const [code2] = await emittedOnce(second, 'exit')
+      expect(code2).to.equal(1)
+      const [code1] = await firstExited
+      expect(code1).to.equal(0)
+      const data2 = (await data2Promise).toString('ascii')
+      const secondInstanceArgsReceived = JSON.parse(data2.toString('ascii'))
+      const expected = process.platform === 'win32'
+        ? [remote.process.execPath, '--some-switch', '--allow-file-access-from-files', secondInstanceArgsReceived.find(x => x.includes('original-process-start-time')), appPath, 'some-arg']
+        : secondInstanceArgs
+      expect(secondInstanceArgsReceived).to.eql(expected,
+        `expected ${JSON.stringify(expected)} but got ${data2.toString('ascii')}`)
+    })
   })
 
   describe('app.relaunch', () => {
@@ -377,6 +405,22 @@ describe('app module', () => {
         })
       })
       w = new BrowserWindow({ show: false })
+    })
+
+    it('should emit renderer-process-crashed event when renderer crashes', async () => {
+      w = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: true
+        }
+      })
+      await w.loadURL('about:blank')
+
+      const promise = emittedOnce(app, 'renderer-process-crashed')
+      w.webContents.executeJavaScript('process.crash()')
+
+      const [, webContents] = await promise
+      expect(webContents).to.equal(w.webContents)
     })
 
     it('should emit desktop-capturer-get-sources event when desktopCapturer.getSources() is invoked', async () => {
